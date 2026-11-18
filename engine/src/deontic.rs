@@ -10,10 +10,10 @@ use crate::exceptions::classify;
 use crate::model::{
     AnalyzeResponse, ClauseFinding, DocumentReport, InversionShape, SCHEMA_VERSION,
 };
-use crate::optout::detect as detect_opt_out;
+use crate::optout::{associate, inspect as inspect_opt_out, Association};
 use crate::rules::{RuleMatch, RuleRegistry};
 use crate::scoring::poison_index;
-use crate::tokenizer::sentences;
+use crate::tokenizer::{sentences, Sentence};
 
 /// Hard limit on analysed input. Anything larger is truncated on a UTF-8
 /// boundary and reported via `DocumentReport::truncated`. This bounds worst-case
@@ -84,7 +84,14 @@ pub fn analyze_with(registry: &RuleRegistry, raw_text: &str) -> DocumentReport {
     let (input, truncated) = truncate_input(raw_text, MAX_INPUT_BYTES);
     let mut findings = Vec::new();
 
-    for sentence in sentences(input) {
+    let clauses = sentences(input);
+    let blocks = block_ids(input, &clauses);
+    // Opt-out facts are only needed once a clause produces a finding; compute
+    // them lazily, at most once per clause, so a document with no findings
+    // pays nothing.
+    let mut opt_out_facts = None;
+
+    for (index, sentence) in clauses.iter().enumerate() {
         let clause = sentence.text;
         let mut emitted_categories: Vec<&'static str> = Vec::new();
 
@@ -100,7 +107,14 @@ pub fn analyze_with(registry: &RuleRegistry, raw_text: &str) -> DocumentReport {
             }
             emitted_categories.push(rule_match.category_id);
 
-            let opt_out = detect_opt_out(clause);
+            let facts = opt_out_facts.get_or_insert_with(|| {
+                clauses
+                    .iter()
+                    .map(|sentence| inspect_opt_out(sentence.text))
+                    .collect::<Vec<_>>()
+            });
+            let association = associate(facts, &blocks, index);
+            let opt_out = association.opt_out();
             findings.push(ClauseFinding {
                 category: rule_match.category_id.to_string(),
                 label: rule_match.label.to_string(),
@@ -113,7 +127,7 @@ pub fn analyze_with(registry: &RuleRegistry, raw_text: &str) -> DocumentReport {
                 opt_out_available: opt_out.available,
                 opt_out_target: opt_out.target,
                 inversion,
-                reason: reason_for(&rule_match, inversion),
+                reason: reason_for(&rule_match, inversion, &association),
             });
         }
     }
@@ -139,8 +153,56 @@ fn truncate_input(text: &str, cap: usize) -> (&str, bool) {
     (&text[..end], true)
 }
 
+/// Block index for each clause. A block is a run of text not interrupted by a
+/// blank line, so association never crosses a paragraph or section break.
+fn block_ids(input: &str, clauses: &[Sentence<'_>]) -> Vec<usize> {
+    let mut ids = Vec::with_capacity(clauses.len());
+    let mut block = 0usize;
+    let mut previous_end = 0usize;
+    for clause in clauses {
+        if previous_end > 0 && is_block_break(&input[previous_end..clause.start]) {
+            block += 1;
+        }
+        ids.push(block);
+        previous_end = clause.end;
+    }
+    ids
+}
+
+/// True when the gap between two clauses contains a blank line.
+fn is_block_break(gap: &str) -> bool {
+    let mut newlines = 0usize;
+    for character in gap.chars() {
+        match character {
+            '\n' => {
+                newlines += 1;
+                if newlines >= 2 {
+                    return true;
+                }
+            }
+            ' ' | '\t' | '\r' => {}
+            _ => newlines = 0,
+        }
+    }
+    false
+}
+
 /// One sentence, built only from matched rule data.
-fn reason_for(rule_match: &RuleMatch, inversion: InversionShape) -> String {
+fn reason_for(
+    rule_match: &RuleMatch,
+    inversion: InversionShape,
+    association: &Association,
+) -> String {
+    let base = base_reason(rule_match, inversion);
+    match association {
+        Association::Neighbour(_) => {
+            format!("{base}; opt-out stated in a neighbouring clause of the same block")
+        }
+        _ => base,
+    }
+}
+
+fn base_reason(rule_match: &RuleMatch, inversion: InversionShape) -> String {
     let quoted = rule_match
         .evidence
         .iter()
@@ -187,6 +249,48 @@ mod tests {
         assert!(findings
             .iter()
             .all(|finding| !finding.opt_out_available && finding.opt_out_target.is_none()));
+    }
+
+    #[test]
+    fn neighbouring_opt_out_is_associated_and_explained() {
+        let doc = "Any dispute shall be resolved by binding arbitration. \
+                   You may opt out within 45 days by emailing optout@example.com.";
+        let finding = analyze(doc).into_iter().next().expect("finding");
+        assert!(finding.opt_out_available);
+        assert_eq!(
+            finding.opt_out_target.as_deref(),
+            Some("optout@example.com")
+        );
+        assert!(finding
+            .reason
+            .ends_with("neighbouring clause of the same block"));
+    }
+
+    #[test]
+    fn blank_line_stops_association() {
+        let doc = "Any dispute shall be resolved by binding arbitration.\n\n\
+                   You may opt out within 45 days by emailing optout@example.com.";
+        let finding = analyze(doc).into_iter().next().expect("finding");
+        assert!(!finding.opt_out_available);
+        assert_eq!(finding.opt_out_target, None);
+    }
+
+    #[test]
+    fn single_newline_keeps_the_block() {
+        let doc = "Any dispute shall be resolved by binding arbitration.\n\
+                   You may opt out within 45 days by emailing optout@example.com.";
+        let finding = analyze(doc).into_iter().next().expect("finding");
+        assert!(finding.opt_out_available);
+    }
+
+    #[test]
+    fn unrelated_neighbouring_opt_out_is_ignored() {
+        let doc = "Any dispute shall be resolved by binding arbitration. \
+                   You may opt out of marketing emails at any time by emailing privacy@example.com.";
+        let finding = analyze(doc).into_iter().next().expect("finding");
+        assert!(!finding.opt_out_available);
+        assert_eq!(finding.opt_out_target, None);
+        assert!(!finding.reason.contains("neighbouring"));
     }
 
     #[test]

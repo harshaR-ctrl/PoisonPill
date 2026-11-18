@@ -1,0 +1,66 @@
+# label	text
+# ---------------------------------------------------------------------------
+# mandatory_arbitration: phrasings that mandate arbitration
+# ---------------------------------------------------------------------------
+mandatory_arbitration	Any controversy or claim arising out of this Agreement shall be settled by arbitration administered by the AAA.
+mandatory_arbitration	All disputes arising under these Terms shall be finally settled by arbitration in accordance with the applicable rules.
+mandatory_arbitration	Any dispute between you and us will be referred to arbitration and finally resolved under the rules of the arbitral institution.
+mandatory_arbitration	Each claim shall be submitted to final and binding arbitration before a single arbitrator.
+mandatory_arbitration	Any dispute shall be submitted to arbitration and decided by one arbitrator.
+mandatory_arbitration	Arbitration shall be the exclusive forum for any dispute arising from your use of the services.
+mandatory_arbitration	You agree that any claim you may have will be resolved exclusively through arbitration.
+mandatory_arbitration	All claims will be finally resolved by arbitration under the Consumer Rules.
+mandatory_arbitration	Any dispute must be settled by arbitration rather than in court.
+mandatory_arbitration	The parties agree that every dispute will be decided by an arbitrator, not a judge or jury.
+mandatory_arbitration	Any dispute, claim or controversy shall be resolved by binding arbitration.
+mandatory_arbitration	Disputes shall be exclusively resolved through arbitration seated in Delaware.
+# ---------------------------------------------------------------------------
+# court_access_waiver: giving up access to a court
+# ---------------------------------------------------------------------------
+court_access_waiver	You waive your right to sue in court and agree that all claims must be brought individually.
+court_access_waiver	By agreeing to these Terms, you are giving up the right to go to court to assert or defend your rights.
+court_access_waiver	You and we each give up the right to litigate claims in court before a judge.
+court_access_waiver	You hereby waive any right to have a dispute heard by a judge.
+court_access_waiver	You agree to forgo any right to bring a lawsuit against the company.
+court_access_waiver	You relinquish your right to file a claim in any court of law.
+court_access_waiver	You expressly waive the right to litigate any dispute in a judicial forum.
+court_access_waiver	You give up your right to bring a lawsuit in court over any claim related to the service.
+court_access_waiver	You waive any right to commence legal proceedings against us in court.
+court_access_waiver	YOU UNDERSTAND THAT YOU ARE GIVING UP YOUR RIGHT TO SUE IN COURT.
+# ---------------------------------------------------------------------------
+# class_action_bar: collective proceedings barred without a waiver verb
+# ---------------------------------------------------------------------------
+class_action_bar	The arbitrator may hear only your individual claims; class proceedings are not permitted.
+class_action_bar	You may bring claims only in your individual capacity, and not as a plaintiff or class member in any purported class or representative proceeding.
+class_action_bar	Claims may be brought only on an individual basis and not as part of any class or representative proceeding.
+class_action_bar	You agree not to participate in any class action against the company.
+class_action_bar	Class arbitrations and class actions are not permitted under this Agreement.
+class_action_bar	The arbitrator may not consolidate claims and may not preside over any form of class proceeding.
+class_action_bar	No dispute may be joined with another or brought as a class action.
+class_action_bar	You will not be a class member or representative in any class action lawsuit against us.
+class_action_bar	Neither party may pursue any claim as a representative action or class action.
+class_action_bar	Each party may bring claims against the other only individually and not in a class action.
+# ---------------------------------------------------------------------------
+# none: near misses that must stay silent
+# ---------------------------------------------------------------------------
+none	The parties settled the dispute last year without any arbitration.
+none	Disputes may be settled by arbitration only if both parties agree in writing.
+none	If you prefer, a dispute may be referred to arbitration by mutual agreement.
+none	Some claims are not subject to arbitration under state law.
+none	Nothing in this section requires you to give up your right to go to court.
+none	You are not giving up any right to sue in court by accepting these terms.
+none	We give up any right to a jury trial in disputes with you.
+none	A court may refer a case to arbitration when both sides request it.
+none	Class actions are a common way to resolve consumer claims in court.
+none	You may bring a class action if the law of your state permits it.
+none	You may cancel or give up your membership at any time.
+none	You may forgo the welcome discount and pay full price instead.
+none	The judge presiding over the case may not be related to either party.
+none	This clause does not limit your right to participate in a class action.
+none	Our support team cannot answer questions about class action settlements.
+none	An arbitration award may be entered as a judgment in any court of competent jurisdiction.
+none	The arbitrator will apply the same law a court would apply.
+none	You keep the right to bring an individual action in small claims court.
+none	Arbitration is optional and you may choose to go to court instead.
+none	If any part of the class action waiver is found unenforceable, the rest of this section still applies.
+none	You may give up your membership at any time, but court fees already paid are not refundable.

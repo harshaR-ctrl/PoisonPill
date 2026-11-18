@@ -3,7 +3,29 @@
 //! control flow. All phrases are lowercase and matched ASCII-case-insensitively.
 
 /// Verbs that transfer a right away from the actor.
-pub const WAIVER_VERBS: &[&str] = &["waive", "waives", "waived", "waiving", "waiver of"];
+pub const WAIVER_VERBS: &[&str] = &[
+    "waive",
+    "waives",
+    "waived",
+    "waiving",
+    "waiver of",
+    // Plain-language synonyms are only waivers when they take a right as their
+    // object; "give up your membership" is not.
+    "give up the right",
+    "give up your right",
+    "give up any right",
+    "gives up the right",
+    "giving up the right",
+    "giving up your right",
+    "giving up any right",
+    "forgo the right",
+    "forgo your right",
+    "forgo any right",
+    "forego any right",
+    "relinquish the right",
+    "relinquish your right",
+    "relinquish any right",
+];
 
 /// Class/collective/representative action language.
 pub const CLASS_ACTIONS: &[&str] = &[
@@ -15,6 +37,8 @@ pub const CLASS_ACTIONS: &[&str] = &[
     "representative action",
     "class member",
     "class arbitration",
+    "representative proceeding",
+    "purported class",
 ];
 
 /// Jury language that can be waived.
@@ -34,6 +58,8 @@ pub const COURT_TERMS: &[&str] = &[
     "judicial",
     "lawsuit",
     "legal proceeding",
+    "judge",
+    "litigate",
 ];
 
 /// Language that actually mandates arbitration, as opposed to describing it.
@@ -53,6 +79,42 @@ pub const MANDATORY_ARBITRATION: &[&str] = &[
     "you agree that all disputes",
     "requires you to arbitrate",
     "required to arbitrate",
+    "settled by arbitration",
+    "referred to arbitration",
+    "submitted to arbitration",
+    "resolved by arbitration",
+    "resolved through arbitration",
+    "resolved exclusively through arbitration",
+    "arbitration shall be the exclusive",
+    "decided by an arbitrator",
+];
+
+/// Modal or consensual arbitration language. A clause that only permits
+/// arbitration, or makes it depend on mutual consent, is not mandatory.
+pub const VOLUNTARY_ARBITRATION: &[&str] = &[
+    "may be settled by arbitration",
+    "may be referred to arbitration",
+    "may be submitted to arbitration",
+    "may be resolved by arbitration",
+    "if both parties agree",
+    "if the parties agree",
+    "by mutual agreement",
+    "if you prefer",
+    "if you wish",
+    "you may choose to",
+    "arbitration is optional",
+    "arbitration is voluntary",
+];
+
+/// References to an arbitration term from severability or interpretation
+/// prose. The sentence is about the clause, not the clause itself.
+pub const SEVERABILITY_REFERENCES: &[&str] = &[
+    "found unenforceable",
+    "found to be unenforceable",
+    "held unenforceable",
+    "deemed unenforceable",
+    "is found invalid",
+    "is held invalid",
 ];
 
 /// Something the arbitration clause can be about.
@@ -68,6 +130,29 @@ pub const CLASS_ACTION_BARS: &[&str] = &[
     "must be brought individually",
     "brought only on an individual basis",
     "individual basis only",
+    "only on an individual basis",
+    "individual capacity",
+    "only individually",
+    "not as a plaintiff",
+    "agree not to",
+    "will not be a class",
+    "neither party may",
+    "no dispute may",
+    "no claim may",
+];
+
+/// A party or proceeding that a class bar restricts. Without one, "cannot" next
+/// to "class action" is ordinary prose ("support cannot answer questions about
+/// class action settlements").
+pub const CLASS_BAR_SUBJECTS: &[&str] = &[
+    "you",
+    "claim",
+    "dispute",
+    "party",
+    "parties",
+    "arbitrator",
+    "under this agreement",
+    "under these terms",
 ];
 
 /// A waiver by the provider is not a user-facing predatory clause.
@@ -79,6 +164,8 @@ pub const PROVIDER_WAIVERS: &[&str] = &[
     "provider waives",
     "we agree to waive",
     "we will never waive",
+    "we give up",
+    "company gives up",
 ];
 
 /// Compliant boilerplate that must suppress an apparent hostile footprint.
@@ -99,6 +186,8 @@ pub const COMPLIANCE_GUARDS: &[&str] = &[
     "will not be construed",
     "shall not be construed",
     "is not intended to",
+    "not give up",
+    "not giving up",
 ];
 
 /// Extra evidence that does not gate a finding.
@@ -169,4 +258,39 @@ pub const OPT_OUT_DAY_WORDS: &[&str] = &[
     "forty-five days",
     "sixty days",
     "ninety days",
+];
+
+/// Subjects that make an opt-out clause about something other than dispute
+/// resolution. A neighbouring opt-out naming one of these is never associated
+/// with a finding in another clause: "opt out of marketing emails" is not the
+/// arbitration opt-out, however close it sits.
+pub const OPT_OUT_FOREIGN_SUBJECTS: &[&str] = &[
+    "marketing",
+    "promotional",
+    "newsletter",
+    "advertising",
+    "advertisement",
+    "cookie",
+    "tracking",
+    "analytics",
+    "profiling",
+    "personal information",
+    "personal data",
+    "data sharing",
+    "sharing of your",
+    "sale of your",
+    "text messages",
+    "auto-renewal",
+    "automatic renewal",
+];
+
+/// Subjects that tie a neighbouring opt-out to dispute resolution. When any
+/// candidate in the association window names one, only those candidates count.
+pub const OPT_OUT_DISPUTE_SUBJECTS: &[&str] = &[
+    "arbitration",
+    "arbitrate",
+    "dispute resolution",
+    "class action waiver",
+    "this provision",
+    "this section",
 ];

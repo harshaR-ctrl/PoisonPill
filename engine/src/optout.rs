@@ -34,6 +34,122 @@ pub fn detect(text: &str) -> OptOut {
     }
 }
 
+/// Maximum distance, in sentences, between a finding and a neighbouring clause
+/// whose opt-out may be associated with it. Both must also share a block (text
+/// not separated by a blank line).
+pub const ASSOCIATION_WINDOW: usize = 3;
+
+/// Opt-out facts for one clause, computed once per document so association is
+/// linear in the number of clauses.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ClauseOptOut {
+    pub opt_out: OptOut,
+    /// The clause opts out of something other than dispute resolution.
+    pub foreign_subject: bool,
+    /// The clause names dispute resolution (arbitration, "this provision", ...).
+    pub dispute_subject: bool,
+}
+
+/// Inspect one clause for association purposes.
+pub fn inspect(text: &str) -> ClauseOptOut {
+    let opt_out = detect(text);
+    if !opt_out.available {
+        return ClauseOptOut::default();
+    }
+    ClauseOptOut {
+        opt_out,
+        foreign_subject: any_phrase(text, lexicon::OPT_OUT_FOREIGN_SUBJECTS),
+        dispute_subject: any_phrase(text, lexicon::OPT_OUT_DISPUTE_SUBJECTS),
+    }
+}
+
+/// Where a finding's opt-out came from.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Association {
+    /// The finding's own clause states action and window.
+    InClause(OptOut),
+    /// A neighbouring clause in the same block does, unambiguously.
+    Neighbour(OptOut),
+    /// No opt-out, or the neighbourhood is ambiguous.
+    None,
+}
+
+impl Association {
+    pub fn opt_out(&self) -> OptOut {
+        match self {
+            Association::InClause(found) | Association::Neighbour(found) => found.clone(),
+            Association::None => OptOut::default(),
+        }
+    }
+}
+
+/// Resolve the opt-out for clause `index`.
+///
+/// The rule is bounded and explainable:
+/// 1. the clause's own opt-out always wins;
+/// 2. otherwise consider clauses in the same block within
+///    [`ASSOCIATION_WINDOW`] sentences that state action *and* window and do
+///    not name a foreign subject (marketing, cookies, personal data, ...);
+/// 3. if any candidate names dispute resolution, keep only those;
+/// 4. if the remaining candidates name more than one distinct address, the
+///    association is ambiguous and nothing is asserted.
+///
+/// `facts` and `blocks` are parallel per-clause arrays.
+pub fn associate(facts: &[ClauseOptOut], blocks: &[usize], index: usize) -> Association {
+    let Some(own) = facts.get(index) else {
+        return Association::None;
+    };
+    if own.opt_out.available {
+        return Association::InClause(own.opt_out.clone());
+    }
+    let Some(&block) = blocks.get(index) else {
+        return Association::None;
+    };
+
+    let low = index.saturating_sub(ASSOCIATION_WINDOW);
+    let high = (index + ASSOCIATION_WINDOW).min(facts.len().saturating_sub(1));
+    let candidates: Vec<&ClauseOptOut> = (low..=high)
+        .filter(|&other| other != index && blocks.get(other) == Some(&block))
+        .filter_map(|other| facts.get(other))
+        .filter(|fact| fact.opt_out.available && !fact.foreign_subject)
+        .collect();
+    if candidates.is_empty() {
+        return Association::None;
+    }
+
+    let specific: Vec<&ClauseOptOut> = candidates
+        .iter()
+        .copied()
+        .filter(|fact| fact.dispute_subject)
+        .collect();
+    let chosen = if specific.is_empty() {
+        candidates
+    } else {
+        specific
+    };
+
+    let mut target: Option<&str> = None;
+    for fact in &chosen {
+        if let Some(address) = fact.opt_out.target.as_deref() {
+            match target {
+                Some(existing) if existing != address => return Association::None,
+                _ => target = Some(address),
+            }
+        }
+    }
+
+    Association::Neighbour(OptOut {
+        available: true,
+        target: target.map(str::to_string),
+    })
+}
+
+fn any_phrase(text: &str, phrases: &[&str]) -> bool {
+    phrases
+        .iter()
+        .any(|phrase| find_phrase(text, phrase).is_some())
+}
+
 /// True when the clause names an action that constitutes opting out.
 pub fn has_opt_out_action(text: &str) -> bool {
     lexicon::OPT_OUT_ACTIONS
@@ -381,6 +497,86 @@ mod tests {
         assert!(has_opt_out_window("a 30-day window"));
         assert!(has_opt_out_window("no later than ninety (90) days"));
         assert!(!has_opt_out_window("within a reasonable while"));
+    }
+
+    fn facts(clauses: &[&str]) -> Vec<ClauseOptOut> {
+        clauses.iter().map(|clause| inspect(clause)).collect()
+    }
+
+    #[test]
+    fn own_clause_opt_out_wins() {
+        let facts = facts(&["Disputes go to binding arbitration; opt out within 30 days."]);
+        assert!(matches!(
+            associate(&facts, &[0], 0),
+            Association::InClause(_)
+        ));
+    }
+
+    #[test]
+    fn neighbour_in_same_block_is_associated() {
+        let facts = facts(&[
+            "Any dispute shall be resolved by binding arbitration.",
+            "You may opt out within 45 days by emailing optout@example.com.",
+        ]);
+        let found = associate(&facts, &[0, 0], 0);
+        assert_eq!(
+            found,
+            Association::Neighbour(OptOut {
+                available: true,
+                target: Some("optout@example.com".into()),
+            })
+        );
+    }
+
+    #[test]
+    fn neighbour_in_another_block_is_not_associated() {
+        let facts = facts(&[
+            "Any dispute shall be resolved by binding arbitration.",
+            "You may opt out within 45 days by emailing optout@example.com.",
+        ]);
+        assert_eq!(associate(&facts, &[0, 1], 0), Association::None);
+    }
+
+    #[test]
+    fn neighbour_beyond_the_window_is_not_associated() {
+        let mut clauses = vec!["Any dispute shall be resolved by binding arbitration."];
+        clauses.extend(["Filler sentence."; ASSOCIATION_WINDOW]);
+        clauses.push("You may opt out within 45 days by emailing optout@example.com.");
+        let facts = facts(&clauses);
+        let blocks = vec![0; facts.len()];
+        assert_eq!(associate(&facts, &blocks, 0), Association::None);
+    }
+
+    #[test]
+    fn foreign_subject_is_never_associated() {
+        let facts = facts(&[
+            "Any dispute shall be resolved by binding arbitration.",
+            "You may opt out of marketing emails at any time by emailing privacy@example.com.",
+        ]);
+        assert_eq!(associate(&facts, &[0, 0], 0), Association::None);
+    }
+
+    #[test]
+    fn competing_addresses_are_ambiguous() {
+        let facts = facts(&[
+            "You may opt out within 30 days by emailing a@example.com.",
+            "Any dispute shall be resolved by binding arbitration.",
+            "You may opt out within 30 days by emailing b@example.com.",
+        ]);
+        assert_eq!(associate(&facts, &[0, 0, 0], 1), Association::None);
+    }
+
+    #[test]
+    fn dispute_subject_breaks_a_tie() {
+        let facts = facts(&[
+            "You may opt out within 30 days by emailing a@example.com.",
+            "Any dispute shall be resolved by binding arbitration.",
+            "To opt out of arbitration, email b@example.com within 30 days.",
+        ]);
+        assert_eq!(
+            associate(&facts, &[0, 0, 0], 1).opt_out().target.as_deref(),
+            Some("b@example.com")
+        );
     }
 
     #[test]

@@ -284,13 +284,28 @@ pub fn find_phrase(haystack: &str, phrase: &str) -> Option<usize> {
     }
 
     let hay = haystack.as_bytes();
-    for start in 0..=hay.len() - needle.len() {
-        if !haystack.is_char_boundary(start) || !haystack.is_char_boundary(start + needle.len()) {
-            continue;
-        }
-        if hay[start..start + needle.len()].eq_ignore_ascii_case(needle) {
+    let last = hay.len() - needle.len();
+    let lower = needle[0].to_ascii_lowercase();
+    let upper = needle[0].to_ascii_uppercase();
+    // An all-ASCII needle can only match ASCII bytes, and an ASCII byte (and
+    // the byte after one) is always a char boundary in valid UTF-8, so the
+    // boundary checks are needed only for non-ASCII needles.
+    let ascii = needle.is_ascii();
+
+    let mut start = 0usize;
+    while start <= last {
+        // Skip straight to the next byte that can begin a match.
+        let offset = hay[start..=last]
+            .iter()
+            .position(|&byte| byte == lower || byte == upper)?;
+        start += offset;
+        let end = start + needle.len();
+        if hay[start..end].eq_ignore_ascii_case(needle)
+            && (ascii || (haystack.is_char_boundary(start) && haystack.is_char_boundary(end)))
+        {
             return Some(start);
         }
+        start += 1;
     }
     None
 }
@@ -310,6 +325,14 @@ fn push_unique(target: &mut Vec<&'static str>, values: Vec<&'static str>) {
 const ARBITRATION_GUARDS: &[Predicate] = &[
     Predicate::AnyPhrase(lexicon::COMPLIANCE_GUARDS),
     Predicate::AnyPhrase(lexicon::PROVIDER_WAIVERS),
+    Predicate::AnyPhrase(lexicon::SEVERABILITY_REFERENCES),
+];
+
+const MANDATORY_ARBITRATION_GUARDS: &[Predicate] = &[
+    Predicate::AnyPhrase(lexicon::COMPLIANCE_GUARDS),
+    Predicate::AnyPhrase(lexicon::PROVIDER_WAIVERS),
+    Predicate::AnyPhrase(lexicon::SEVERABILITY_REFERENCES),
+    Predicate::AnyPhrase(lexicon::VOLUNTARY_ARBITRATION),
 ];
 
 /// The one reference category. Every field is data.
@@ -370,7 +393,7 @@ pub const ARBITRATION_RULES: &[RuleSpec] = &[
             Predicate::AnyPhrase(lexicon::DISPUTE_NEXUS),
         ],
         optional: &[],
-        prohibited: ARBITRATION_GUARDS,
+        prohibited: MANDATORY_ARBITRATION_GUARDS,
         proximity_window: 60,
         inversion_sensitive: false,
     },
@@ -383,6 +406,7 @@ pub const ARBITRATION_RULES: &[RuleSpec] = &[
         required: &[
             Predicate::AnyPhrase(lexicon::CLASS_ACTIONS),
             Predicate::AnyPhrase(lexicon::CLASS_ACTION_BARS),
+            Predicate::AnyPhrase(lexicon::CLASS_BAR_SUBJECTS),
         ],
         optional: &[],
         prohibited: ARBITRATION_GUARDS,
@@ -459,6 +483,16 @@ mod tests {
     #[test]
     fn phrase_search_is_ascii_case_insensitive() {
         assert_eq!(find_phrase("You WAIVE all claims", "waive"), Some(4));
+    }
+
+    #[test]
+    fn phrase_search_handles_multibyte_text() {
+        let text = "Ünïcode — you waive";
+        assert_eq!(find_phrase(text, "WAIVE"), text.find("waive"));
+        assert_eq!(find_phrase("naïve waiver", "ïve"), Some(2));
+        assert_eq!(find_phrase("🚫🚫", "x"), None);
+        assert_eq!(find_phrase("ab", "abc"), None);
+        assert_eq!(find_phrase("aaab", "aab"), Some(1));
     }
 
     #[test]
