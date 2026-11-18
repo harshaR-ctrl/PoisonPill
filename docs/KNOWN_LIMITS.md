@@ -15,12 +15,10 @@ Matching is ASCII-case-insensitive substring search over the phrase lists in
 in those lists, it does not fire. There is no stemming, no lemmatisation, and no
 semantic model.
 
-Visible consequence: `06-marketplace-terms.txt` says a dispute "shall be settled
-by arbitration". `MANDATORY_ARBITRATION` contains "resolved by", "arbitrated",
-and "agree to arbitrate", but not "settled by arbitration", so a clearly
-predatory clause produces no finding. Adding the phrase is backlog work and needs
-its own hard negatives, because "settled" also appears in benign settlement
-language.
+Visible consequence at `v0.1.0-base`: `06-marketplace-terms.txt` said a dispute
+"shall be settled by arbitration" and produced no finding. The phrase has since
+been added with voluntary-arbitration guards (decision 17), but the general
+point stands: any phrasing outside the lists is invisible.
 
 Because the match is substring-based, a phrase must be specific enough to
 explain itself. Broad phrases such as `court` are only safe when paired with a
@@ -51,14 +49,15 @@ class action" reports `class_action_waiver` only. The jury waiver in the same
 sentence is real but not represented. Separate sentences in
 `11-subscription-bullets.txt` report both.
 
-### `court_access_waiver` and `class_action_bar` have not fired on real text
+### `court_access_waiver` and `class_action_bar` recall is dev-set only
 
-The held-out run recorded zero hits for both. They are not dead code — fixtures
-`positive/03-court-access-waiver` and `positive/05-class-action-bar` exercise
-them — but the corpus's court language is either descriptive ("Nothing in this
-Addendum limits ... right to bring a claim in court"), negated ("We do not waive
-..."), or split across sentences from the waiver verb. Until a labelled corpus
-says otherwise, treat their real-world recall as unproven.
+On the labelled dev set (`fixtures/labelled/`) both rules now hit every
+realistic phrasing (10/10 each) with no near miss firing; before the lexicon
+work they hit 3/10 each. Those are development numbers: the lexicon was extended
+while looking at that set. The frozen held-out corpus still records zero hits for
+both, partly because the clauses there that mention court are either descriptive
+or already claimed by an earlier rule in the same category (one finding per
+category per clause). Treat their real-world recall as plausible, not measured.
 
 ### Precision and recall are unmeasured
 
@@ -75,14 +74,17 @@ and no detection. Absence of a finding says nothing about those categories.
 
 ## Opt-out
 
-### Clause-scoped association
+### Block-bounded association
 
-An opt-out is recognised only when an action and a window appear in the same
-sentence. Four held-out documents (`01`, `04`, `09`, `14`) state the window in a
-different sentence from the arbitration finding. All 15 held-out findings report
-`opt_out_available: false` even where the document genuinely offers an opt-out.
-This is a deliberate precision choice, not a parser failure: the address is
-usually found, the association is not asserted.
+An opt-out clause still needs an action and a window in one sentence. Since
+decision 16 a finding may borrow the opt-out of a clause up to three sentences
+away in the same block (no blank line between them), unless that clause names a
+foreign subject (marketing, cookies, personal data, …) or the neighbourhood
+offers two different addresses. Held-out `01`, `04`, `09` and `14` now report
+the opt-out. Still missed: an opt-out in a separate section after a heading and a
+blank line, one more than three sentences away, and one whose subject is only
+implied by a heading. The foreign/dispute subject lists are lexicon data with the
+same substring limits as every other list.
 
 ### Action plus window, or nothing
 

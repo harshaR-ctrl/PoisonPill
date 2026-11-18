@@ -13,18 +13,21 @@ correct; the tag promises the mechanism and one authored category, not coverage.
    category without its hard negatives; a thin lexicon is a false-positive
    generator. Follow [`RULES.md`](RULES.md); do not add matcher branches.
 
-2. **Broaden `MANDATORY_ARBITRATION` for real phrasings.** "shall be settled by
+2. ~~**Broaden `MANDATORY_ARBITRATION` for real phrasings.**~~ *Done — decision
+   17.* "shall be settled by
    arbitration" is the known miss in `06-marketplace-terms.txt`. Candidates:
    "settled by arbitration", "referred to arbitration", "subject to arbitration",
    "arbitration shall be the exclusive". Each needs a hard negative for benign
    settlement and for "arbitration is available" language.
 
-3. **Prove or fix `court_access_waiver` and `class_action_bar` recall.** Both are
+3. ~~**Prove or fix `court_access_waiver` and `class_action_bar` recall.**~~
+   *Done on a dev set — decision 17; a sampled labelled corpus is still item 8.* Both are
    fixture-positive but produced zero held-out hits. Build a small labelled set
    of real court-access and class-bar clauses, measure, and either add lexicon
    phrases or narrow the rule's claim in `docs/RULES.md`.
 
-4. **Cross-clause opt-out association.** The largest known recall gap: an opt-out
+4. ~~**Cross-clause opt-out association.**~~ *Done, block-bounded — decision
+   16.* The largest known recall gap: an opt-out
    window stated in a neighbouring sentence or section is not associated with the
    finding. The design needs a bounded, explainable rule — for example, a window
    and address in the same *section* with no competing address — not a

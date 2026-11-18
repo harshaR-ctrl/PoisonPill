@@ -24,7 +24,7 @@ by the deterministic order of rules in the registry.
 | `severity` | number | Base category weight `w_k` in `[1.0, 5.0]`. **Not** the poison-index contribution. |
 | `start_offset` | integer | Inclusive byte offset of `raw_text` in the exact input string. |
 | `end_offset` | integer | Exclusive byte offset of `raw_text` in the exact input string. |
-| `opt_out_available` | boolean | The clause states an opt-out action *and* a window. |
+| `opt_out_available` | boolean | The clause, or one unambiguous neighbouring clause in the same block, states an opt-out action *and* a window. See *Opt-out semantics*. |
 | `opt_out_target` | string? | Verified email address, or omitted. Only present when `opt_out_available` is true. |
 | `inversion` | see below | Effect of exception markers on this clause. |
 | `reason` | string | One sentence explaining which matched data made the rule fire. |
@@ -64,8 +64,23 @@ stated window never qualifies and `opt_out_target` is absent.
 `opt_out_target` is the first valid address in the clause, lowercased and rebuilt
 from its parts. Common obfuscation (`[at]`, `(at)`, ` at `, `[dot]`, `(dot)`,
 ` dot `) is accepted. Malformed addresses and prose such as `email us at
-example.com` do not produce a target. Detection is clause-scoped: the action and
-the window must appear in the same sentence.
+example.com` do not produce a target. The action and the window must appear in
+the same sentence; that sentence is the *opt-out clause*.
+
+A finding's opt-out is resolved in this order:
+
+1. If the finding's own clause is an opt-out clause, it is used.
+2. Otherwise, opt-out clauses within 3 sentences of the finding **and** in the
+   same block (no blank line between them) are candidates, excluding any that
+   name a foreign subject (`marketing`, `cookie`, `personal data`, …).
+3. If any candidate names dispute resolution (`arbitration`, `this provision`,
+   …), only those candidates count.
+4. If the remaining candidates name more than one distinct address, the
+   association is ambiguous: `opt_out_available` is `false`.
+
+A neighbouring association appends `; opt-out stated in a neighbouring clause of
+the same block` to `reason`, so the claim is always explainable from the report.
+The field shapes did not change, so `schema_version` stays `"1.0"`.
 
 The engine detects the address; generating mail is out of scope for the engine.
 

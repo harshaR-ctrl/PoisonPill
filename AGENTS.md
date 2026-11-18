@@ -22,6 +22,8 @@ PoisonPill is a local-first Chrome Manifest V3 extension that flags predatory co
 | `engine/tests/fixtures.rs` | Corpus/golden harness and offset invariants. |
 | `engine/tests/rule_format.rs` | Runtime registration proof for the declarative rule format. |
 | `engine/tests/budgets.rs` | Ignored 10k-word release latency budget. |
+| `engine/tests/labelled.rs` | Labelled dev-set precision guard and per-rule recall report. |
+| `fixtures/labelled/` | Clause-level dev set (`clauses.tsv`); not held out. |
 | `fixtures/cases/` | Positive, hard-negative and ordinary-negative regression corpus. |
 | `fixtures/golden/` | Exact canonical envelopes; never written by tests. |
 | `fixtures/heldout/` | One-shot corpus and its recorded `REPORT.md`. |
@@ -62,11 +64,14 @@ Prerequisites: `wasm-pack` (`cargo install wasm-pack`), the `wasm32-unknown-unkn
 
 - Rust: edition 2021, `#![deny(unsafe_code)]` unless a comment justifies it, no panics on user text (`unwrap` only on serialisation of owned structs).
 - Severity weights come from `RuleSpec.weight` in `rules.rs` and follow the spec table (arbitration `5.0` … surveillance `3.0`). Scores are normalised into `P_I ∈ [0, 100]` at the document level, never per clause. Only Forced Arbitration is authored; the other four categories are empty slots. See `docs/RULES.md`.
-- Opt-out detection is clause-scoped: an action and a window must appear in the same sentence. `optout.rs` owns address extraction; TypeScript only displays the result and never generates mail.
+- An opt-out clause needs an action and a window in the same sentence. A finding uses its own opt-out clause, else one unambiguous neighbour within 3 sentences in the same block (`optout::associate`; see `docs/CONTRACT.md`). `optout.rs` owns address extraction and association; TypeScript only displays the result and never generates mail.
 - Keep `engine` free of Chrome APIs so it stays testable with plain `cargo test`.
 - TypeScript: strict mode, no `any` at the worker boundary, explicit `MessageEvent` types.
 
 ## Gotchas
+
+- `.gitattributes` pins LF. Offsets are byte offsets, so a CRLF checkout (Git for Windows with `core.autocrlf=true`) would shift every golden; do not remove it.
+- On Windows without Visual Studio Build Tools, the MSVC Rust toolchain cannot link. Use `stable-x86_64-pc-windows-gnu` (`rustup toolchain install stable-x86_64-pc-windows-gnu -t wasm32-unknown-unknown`, then `RUSTUP_TOOLCHAIN=stable-x86_64-pc-windows-gnu`). Building `wasm-bindgen-cli` from source there also needs a MinGW assembler; installing the prebuilt `wasm-pack`/`wasm-bindgen` release binary is simpler.
 
 - `manifest.json` references the flattened `dist/` root, so asset paths (`icons/…`, `popup.html`) are relative to `dist`, not `extension/`.
 - `engine.js`/`engine.wasm` are committed despite living in `public/`. After changing Rust, run `make engine` and commit both files; `make parity` tests the committed bytes.

@@ -29,6 +29,12 @@ TypeScript typecheck. Numbers and environment are in
 
 ## Start here: the first three tasks
 
+> **Status (post-`v0.1.0-base`):** all three are implemented — see decisions 16
+> and 17 in [`DECISIONS.md`](DECISIONS.md) and the post-base section of
+> [`MEASUREMENTS.md`](MEASUREMENTS.md). Held-out `01`, `04`, `09`, `14` report
+> the opt-out and `06` fires. The next pick is the backlog's item 1 (a second
+> category). The text below is kept as the record of what was asked.
+
 Do them in this order unless you have a reason not to. Each is bounded and each
 has an acceptance test you can write before the implementation.
 
