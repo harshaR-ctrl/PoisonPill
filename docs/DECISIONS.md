@@ -384,3 +384,23 @@ page's CSP, and the worker would run in the page origin).
 restart pays Wasm instantiation again. Parsing is off the page's main thread but
 shares the service worker with any future background logic.
 
+## 19. GSAP drives the popup's score-card entrance
+
+**Status:** accepted (post-`v0.1.0-base`).
+
+**Context.** The popup's gradient gauge needs the arc fill, the knob, a count-up
+of the score and the knob's colour along the gradient to move as one. CSS
+transitions cannot count a number or interpolate a colour along the gradient,
+and three separately timed transitions drift.
+
+**Decision.** `gsap` 3.15.1 (exact pin, GSAP standard no-charge licence) is a
+runtime dependency of `popup.ts` only, bundled by esbuild into `dist/popup.js`.
+One `gsap.timeline()` sequences the sweep and the pill/verdict reveal;
+`gsap.matchMedia()` jumps to the end state under `prefers-reduced-motion`. It
+makes no network requests and uses no `eval`, so the CSP is unchanged. Content
+script and worker do not import it. `tsconfig.json` uses
+`moduleResolution: "bundler"` to resolve it for typechecking.
+
+**Cost.** `dist/popup.js` grows to ~187 KB unminified, loaded from the extension
+package only when the popup opens.
+

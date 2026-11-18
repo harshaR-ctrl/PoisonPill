@@ -3,15 +3,343 @@
   <head>
     <meta charset="utf-8" />
     <title>PoisonPill</title>
+    <style>
+      :root {
+        --bg: #f6f7f9;
+        --surface: #ffffff;
+        --border: #e3e6eb;
+        --text: #1b1f24;
+        --muted: #5d6673;
+        --quote-bg: #f2f4f7;
+        --track: #e7e9ee;
+        --ok: #15803d;
+        --ok-bg: #dcfce7;
+        --low: #a16207;
+        --low-bg: #fef3c7;
+        --mid: #c2410c;
+        --mid-bg: #ffedd5;
+        --high: #dc2626;
+        --high-bg: #fee2e2;
+        --severe: #9f1239;
+        --severe-bg: #ffe4e6;
+        --accent: var(--muted);
+        --accent-bg: var(--quote-bg);
+        --hairline: rgba(15, 23, 42, 0.08);
+        --shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 2px 8px rgba(15, 23, 42, 0.04);
+        --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #15181d;
+          --surface: #1d2127;
+          --border: #2e343d;
+          --text: #e7eaee;
+          --muted: #9aa3ae;
+          --quote-bg: #252a31;
+          --track: #2e343d;
+          --ok: #4ade80;
+          --ok-bg: #12301f;
+          --low: #facc15;
+          --low-bg: #332b0d;
+          --mid: #fb923c;
+          --mid-bg: #3a2312;
+          --high: #f87171;
+          --high-bg: #3d1a1a;
+          --severe: #fb7185;
+          --severe-bg: #3d1525;
+          --hairline: rgba(255, 255, 255, 0.08);
+          --shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+      }
+      [data-band='none'] { --accent: var(--ok); --accent-bg: var(--ok-bg); }
+      [data-band='low'] { --accent: var(--low); --accent-bg: var(--low-bg); }
+      [data-band='moderate'] { --accent: var(--mid); --accent-bg: var(--mid-bg); }
+      [data-band='high'] { --accent: var(--high); --accent-bg: var(--high-bg); }
+      [data-band='severe'] { --accent: var(--severe); --accent-bg: var(--severe-bg); }
+
+      * { box-sizing: border-box; }
+      html, body { margin: 0; }
+      body {
+        width: 380px;
+        max-height: 600px;
+        overflow-y: auto;
+        background: var(--bg);
+        color: var(--text);
+        font: 13px/1.45 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      }
+      [hidden] { display: none !important; }
+
+      header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 16px;
+        background: var(--surface);
+        box-shadow: 0 1px 0 var(--hairline);
+        position: sticky;
+        top: 0;
+        z-index: 1;
+      }
+      header img { width: 24px; height: 24px; }
+      header h1 { margin: 0; font-size: 15px; font-weight: 650; }
+      header p { margin: 0; color: var(--muted); font-size: 11px; }
+
+      main { padding: 12px 16px 4px; display: grid; gap: 12px; }
+      #report { display: grid; gap: 12px; }
+      #report:empty { display: none; }
+
+      .card {
+        background: var(--surface);
+        border-radius: 12px;
+        box-shadow: 0 0 0 1px var(--hairline), var(--shadow);
+        padding: 14px;
+      }
+
+      /* Score card */
+      .score-card {
+        padding: 18px 16px 0;
+        overflow: hidden;
+        background:
+          radial-gradient(120% 90% at 50% 0%, var(--accent-bg) 0%, transparent 70%),
+          var(--surface);
+        text-align: center;
+      }
+      .gauge { position: relative; width: 220px; margin: 0 auto; }
+      .gauge svg { display: block; width: 100%; height: auto; overflow: visible; }
+      .gauge .track { opacity: 0.18; }
+      /* Arc, knob and readout are driven by the GSAP timeline in popup.ts. */
+      .gauge .knob { fill: var(--surface); stroke: #22c55e; stroke-width: 4; }
+      .readout {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 2px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .readout strong {
+        font-size: 44px;
+        line-height: 1;
+        font-weight: 750;
+        letter-spacing: -1.5px;
+        color: var(--accent);
+        font-variant-numeric: tabular-nums;
+      }
+      .readout span {
+        margin-top: 2px;
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 12px;
+        padding: 3px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 650;
+        color: var(--accent);
+        background: var(--accent-bg);
+      }
+      .pill::before {
+        content: '';
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--accent);
+      }
+      .verdict { margin: 8px 0 14px; color: var(--muted); }
+      .source {
+        margin: 0 -16px;
+        padding: 9px 16px;
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        box-shadow: 0 -1px 0 var(--hairline);
+        background: color-mix(in srgb, var(--bg) 60%, transparent);
+        color: var(--muted);
+        font-size: 12px;
+        text-align: left;
+      }
+      .source b {
+        color: var(--text);
+        font-weight: 600;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .source time { white-space: nowrap; }
+
+      .notice {
+        margin: 0;
+        padding: 8px 12px;
+        border-radius: 8px;
+        background: var(--low-bg);
+        color: var(--low);
+        font-size: 12px;
+      }
+
+      /* Findings */
+      .group h2 {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin: 0 0 8px;
+        font-size: 13px;
+        font-weight: 650;
+      }
+      .group h2 .count {
+        min-width: 22px;
+        padding: 0 7px;
+        border-radius: 999px;
+        background: var(--high-bg);
+        color: var(--high);
+        font-size: 11px;
+        text-align: center;
+      }
+      .group p.blurb { margin: -4px 0 10px; color: var(--muted); font-size: 12px; }
+      .group ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+
+      .finding blockquote {
+        margin: 0;
+        padding: 8px 10px;
+        border-left: 3px solid var(--high);
+        border-radius: 0 6px 6px 0;
+        background: var(--quote-bg);
+        overflow-wrap: anywhere;
+      }
+      .finding blockquote.clamped {
+        display: -webkit-box;
+        -webkit-line-clamp: 4;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+      .finding blockquote[role='button'] {
+        cursor: pointer;
+        transition: transform 160ms var(--ease-out), background-color 150ms ease;
+      }
+      .finding blockquote[role='button']:active { transform: scale(0.985); }
+      @media (hover: hover) and (pointer: fine) {
+        .finding blockquote[role='button']:hover { background: color-mix(in srgb, var(--quote-bg) 80%, var(--text) 6%); }
+        .finding summary:hover { color: var(--text); }
+      }
+      :focus-visible { outline: 2px solid var(--accent, #2563eb); outline-offset: 2px; border-radius: 6px; }
+      .finding .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+      .badge {
+        padding: 1px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 600;
+        background: var(--quote-bg);
+        color: var(--muted);
+        overflow-wrap: anywhere;
+      }
+      .badge.optout { background: var(--ok-bg); color: var(--ok); }
+      .finding details { font-size: 11px; color: var(--muted); }
+      .finding summary {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        list-style: none;
+        cursor: pointer;
+        transition: color 150ms ease;
+      }
+      .finding summary::-webkit-details-marker { display: none; }
+      .finding summary::before {
+        content: '';
+        width: 5px;
+        height: 5px;
+        border-right: 1.5px solid currentColor;
+        border-bottom: 1.5px solid currentColor;
+        transform: rotate(-45deg);
+        transition: transform 150ms var(--ease-out);
+      }
+      .finding details[open] summary::before { transform: rotate(45deg); }
+      .finding details p { margin: 4px 0 0; font-family: ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }
+
+      .empty { text-align: center; padding: 24px 16px; }
+      .empty .icon { font-size: 28px; line-height: 1; }
+      .empty h2 { margin: 8px 0 4px; font-size: 14px; }
+      .empty p { margin: 0; color: var(--muted); }
+
+      @media (prefers-reduced-motion: reduce) {
+        .finding summary::before { transition: none; }
+        .finding blockquote[role='button']:active { transform: none; }
+      }
+
+      footer {
+        padding: 10px 16px 14px;
+        color: var(--muted);
+        font-size: 11px;
+        text-align: center;
+      }
+    </style>
   </head>
   <body>
-    <h1>PoisonPill</h1>
-    <p>Poison index: <strong id="poison-index">--</strong> / 100</p>
-    <p id="none" hidden>No legal page has been scanned yet.</p>
-    <p id="source" hidden>Last scan: <span id="source-url"></span></p>
-    <p id="empty" hidden>No predatory clauses detected on that page.</p>
-    <div id="report"></div>
-    <p><small>Local analysis. Nothing leaves this browser.</small></p>
+    <header>
+      <img src="icons/icon-128.png" alt="" />
+      <div>
+        <h1>PoisonPill</h1>
+        <p>Local legal shield</p>
+      </div>
+    </header>
+
+    <main>
+      <section id="none" class="card empty" hidden>
+        <div class="icon" aria-hidden="true">&#128269;</div>
+        <h2>No legal page scanned yet</h2>
+        <p>Open a terms of service, EULA or privacy page and PoisonPill will scan it automatically.</p>
+      </section>
+
+      <section id="summary" class="card score-card" hidden>
+        <div class="gauge" role="meter" aria-label="Poison index" aria-valuemin="0" aria-valuemax="100">
+          <svg viewBox="0 0 220 120" aria-hidden="true">
+            <defs>
+              <linearGradient id="risk" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0" stop-color="#22c55e" />
+                <stop offset="0.25" stop-color="#eab308" />
+                <stop offset="0.5" stop-color="#f97316" />
+                <stop offset="0.75" stop-color="#ef4444" />
+                <stop offset="1" stop-color="#be123c" />
+              </linearGradient>
+            </defs>
+            <path class="track" d="M 20 110 A 90 90 0 0 1 200 110" fill="none" stroke="url(#risk)" stroke-width="14" stroke-linecap="round" />
+            <path id="gauge-fill" class="fill" d="M 20 110 A 90 90 0 0 1 200 110" pathLength="100"
+                  fill="none" stroke="url(#risk)" stroke-width="14" stroke-linecap="round" stroke-dasharray="0 100" />
+            <circle id="gauge-knob" class="knob" cx="20" cy="110" r="8" />
+          </svg>
+          <div class="readout">
+            <strong id="poison-index">--</strong>
+            <span>Poison index</span>
+          </div>
+        </div>
+        <span id="band" class="pill"></span>
+        <p id="verdict" class="verdict"></p>
+        <p class="source">
+          <b id="source-host"></b>
+          <time id="scanned-at"></time>
+        </p>
+      </section>
+
+      <p id="truncated" class="notice" hidden>
+        This page was very long, so only its first part was analysed.
+      </p>
+
+      <section id="empty" class="card empty" hidden>
+        <div class="icon" aria-hidden="true">&#9989;</div>
+        <h2>No predatory clauses found</h2>
+        <p>Nothing on this page matched forced arbitration, class-action or court-access waivers.</p>
+      </section>
+
+      <div id="report"></div>
+    </main>
+
+    <footer>Analysed on this device. Nothing leaves your browser.</footer>
     <script src="popup.js" defer></script>
   </body>
 </html>
