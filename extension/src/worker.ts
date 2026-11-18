@@ -1,8 +1,15 @@
-// Dedicated worker: the only place the Wasm engine is instantiated.
+// Background service worker: the only place the Wasm engine is instantiated.
 //
-// `engine.js` is the `wasm-pack --target no-modules` loader, so it is pulled in
-// with `importScripts` and exposes `wasm_bindgen`. Everything stays on the
-// extension origin; nothing is fetched from the network.
+// Content scripts run in the page's origin and cannot construct a Worker from a
+// chrome-extension:// URL (Chrome throws a cross-origin SecurityError), so the
+// engine lives in the extension's own service worker and content scripts reach
+// it with `chrome.runtime.sendMessage`. This keeps parsing off the page's main
+// thread and needs no permission beyond `storage`.
+//
+// `engine.js` is the `wasm-pack --target no-modules` loader. Service workers
+// may only call `importScripts` during initial evaluation, so it is imported at
+// top level; the Wasm module itself is instantiated lazily on first use.
+// Everything stays on the extension origin; nothing is fetched from the network.
 
 import type {
   AnalyzeResponse,
@@ -23,10 +30,7 @@ declare const wasm_bindgen: {
   LegalEngine: new () => LegalEngine;
 };
 
-const scope = self as unknown as {
-  onmessage: ((event: MessageEvent<WorkerRequest>) => void) | null;
-  postMessage(message: WorkerResponse): void;
-};
+importScripts('engine.js');
 
 class EngineFailure extends Error {
   constructor(readonly payload: EngineError) {
@@ -39,7 +43,6 @@ let enginePromise: Promise<LegalEngine> | null = null;
 
 function loadEngine(): Promise<LegalEngine> {
   enginePromise ??= (async () => {
-    importScripts(chrome.runtime.getURL('engine.js'));
     await wasm_bindgen({ module_or_path: chrome.runtime.getURL('engine.wasm') });
     return new wasm_bindgen.LegalEngine();
   })().catch((error: unknown) => {
@@ -66,7 +69,8 @@ function unwrap(response: AnalyzeResponse): DocumentReport {
 
 async function analyzeText(text: string): Promise<DocumentReport> {
   const engine = await loadEngine();
-  return unwrap(parseEnvelope(engine.analyzeJson(text)));
+  // `analyzeJson` returns the canonical envelope as a JSON string.
+  return unwrap(parseEnvelope(JSON.parse(engine.analyzeJson(text)) as unknown));
 }
 
 async function playbackFixture(): Promise<DocumentReport> {
@@ -97,18 +101,30 @@ async function run(request: WorkerRequest): Promise<DocumentReport> {
   }
 }
 
-async function handle(request: WorkerRequest): Promise<void> {
+async function handle(request: WorkerRequest): Promise<WorkerResponse> {
   try {
-    scope.postMessage({ type: 'ANALYSIS_RESULT', report: await run(request) });
+    return { type: 'ANALYSIS_RESULT', report: await run(request) };
   } catch (error: unknown) {
-    scope.postMessage({ type: 'ANALYSIS_ERROR', error: toEngineError(error) });
+    return { type: 'ANALYSIS_ERROR', error: toEngineError(error) };
   }
 }
 
-scope.onmessage = (event) => {
-  const request = event.data;
-  if (request?.type !== 'ANALYZE_TEXT' && request?.type !== 'PLAYBACK_FIXTURE') {
-    return;
+function isWorkerRequest(value: unknown): value is WorkerRequest {
+  if (typeof value !== 'object' || value === null || !('type' in value)) {
+    return false;
   }
-  void handle(request);
-};
+  const { type } = value as { type: unknown };
+  if (type === 'PLAYBACK_FIXTURE') return true;
+  return type === 'ANALYZE_TEXT' && typeof (value as { text?: unknown }).text === 'string';
+}
+
+chrome.runtime.onMessage.addListener(
+  (message: unknown, sender, sendResponse: (response: WorkerResponse) => void) => {
+    // Only this extension's own scripts may ask for analysis.
+    if (sender.id !== chrome.runtime.id || !isWorkerRequest(message)) {
+      return false;
+    }
+    void handle(message).then(sendResponse);
+    return true; // keep the channel open for the async response
+  },
+);

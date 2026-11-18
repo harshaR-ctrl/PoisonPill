@@ -53,8 +53,9 @@ Prerequisites: `wasm-pack` (`cargo install wasm-pack`), the `wasm32-unknown-unkn
 
 - **Zero network egress.** No `fetch`, `XMLHttpRequest`, WebSocket, telemetry, CDN fonts, or remote stylesheets. The single `fetch` in `worker.ts` reads `chrome.runtime.getURL('playback.json')`, a local extension resource. `manifest.json` grants `storage` only — `host_permissions` stays empty.
 - **Detection lives in Rust.** Content scripts extract text and display the stored report; they never classify clauses. Adding a heuristic in TypeScript is a design regression.
+- **`analyzeJson` returns a string.** The worker must `JSON.parse` it before unwrapping the envelope.
 - **The Wasm contract is snake_case JSON.** The Rust source of truth is `engine/src/model.rs`; `extension/src/types.ts` mirrors it exactly. `ClauseFinding` carries `category`, `label`, `rule_id`, `raw_text`, `modality`, `severity`, `start_offset`, `end_offset`, `opt_out_available`, `opt_out_target`, `inversion`, `reason`. Offsets are UTF-8 byte offsets into the exact input. `opt_out_target` is omitted when absent. See `docs/CONTRACT.md`.
-- **Analysis runs off the main thread.** All parsing goes through `worker.js`; the content script only posts text and consumes the report.
+- **Analysis runs off the page's main thread.** All parsing goes through `worker.js`, the extension's MV3 background service worker; the content script sends text with `chrome.runtime.sendMessage` and stores the response. A content script cannot construct a `Worker` from a `chrome-extension://` URL (cross-origin `SecurityError`), so do not reintroduce `new Worker` there.
 - **`wasm-unsafe-eval` stays in the CSP.** Removing it breaks Wasm instantiation; widen nothing else.
 - **The content script writes nothing to the page.** No badges, highlights, shields, jump-to-clause or theming. The popup renders the stored report in its own document only. Those other features are product work layered on the contract, not part of this base.
 - **Input work is bounded.** The engine analyses at most 512 KiB, cuts on a UTF-8 boundary, and sets `truncated`.
@@ -75,7 +76,7 @@ Prerequisites: `wasm-pack` (`cargo install wasm-pack`), the `wasm32-unknown-unkn
 
 - `manifest.json` references the flattened `dist/` root, so asset paths (`icons/…`, `popup.html`) are relative to `dist`, not `extension/`.
 - `engine.js`/`engine.wasm` are committed despite living in `public/`. After changing Rust, run `make engine` and commit both files; `make parity` tests the committed bytes.
-- Chrome loads `worker.js` as a classic worker, and content/popup scripts are classic scripts. `tsconfig.json` is typecheck-only (`noEmit`); esbuild emits IIFE bundles. Never emit ES modules or CommonJS `exports` references for these entry points.
+- Chrome loads `worker.js` as a classic service worker (no `"type": "module"`), so `importScripts('engine.js')` must stay at top level; content/popup scripts are classic scripts. `tsconfig.json` is typecheck-only (`noEmit`); esbuild emits IIFE bundles. Never emit ES modules or CommonJS `exports` references for these entry points.
 - The executable entry points are `extension/src/content.ts`, `worker.ts`, and `popup.ts`; `types.ts` is type-only and is not bundled.
 - The spec's `$P_I$` weighting uses per-category `w_k`; the taxonomy table is authoritative when numbers disagree.
 - SHA-256 tree-diff/audit memory is not implemented in this base. If added later, store digests and offsets under `chrome.storage.local`, not full contract text.

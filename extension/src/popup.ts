@@ -37,13 +37,23 @@ async function load(): Promise<void> {
   };
   const record = stored.last_scan;
 
-  if (!record || record.report.findings.length === 0) {
-    empty?.removeAttribute('hidden');
+  if (!record) {
+    document.getElementById('none')?.removeAttribute('hidden');
     return;
   }
 
+  // The record is the most recent scan of any page, so say which one.
+  const sourceUrl = document.getElementById('source-url');
+  if (sourceUrl) sourceUrl.textContent = record.url;
+  document.getElementById('source')?.removeAttribute('hidden');
+
   if (index) {
     index.textContent = record.report.poison_index.toFixed(1);
+  }
+
+  if (record.report.findings.length === 0) {
+    empty?.removeAttribute('hidden');
+    return;
   }
 
   const list = document.createElement('ul');

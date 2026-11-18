@@ -210,7 +210,7 @@ by `make engine` and `make parity`.
 **Context.** The spec's product layer (highlights, badges, jump-to-clause,
 theming) is large and easy to build on top of an unstable contract.
 
-**Decision.** `content.ts` extracts page text, sends it to the worker, and stores
+**Decision.** `content.ts` extracts page text, sends it to the engine's service worker (decision 18), and stores
 one `last_scan` record. It does not mutate the page. `popup.ts` renders that
 record as plain text in the extension's own document. No highlighting, badges,
 shields, jump-to-clause, history, or mail generation. The shell exists to prove
@@ -355,4 +355,32 @@ partly because of decision 2: in those documents another rule claims the
 category first. The phrase count roughly doubled, so `find_phrase` was rewritten
 to skip to candidate first bytes (same results, goldens unchanged); see
 `MEASUREMENTS.md`.
+
+## 18. The engine runs in the background service worker
+
+**Status:** accepted (post-`v0.1.0-base`); fixes a shell that never scanned.
+
+**Context.** Loading `dist/` in Chrome 157 and visiting a terms page showed the
+reference shell had never produced a report. The content script runs in the
+page's origin, and `new Worker(chrome.runtime.getURL('worker.js'))` throws a
+cross-origin `SecurityError`, so nothing was analysed or stored, and the popup
+said "No predatory clauses detected". A second bug hid behind it: the worker
+passed `analyzeJson`'s JSON *string* to `parseEnvelope`, which rejected it as a
+malformed envelope. Parity tests run the engine in Node, so neither surfaced.
+
+**Decision.** `worker.js` is declared as the MV3 `background.service_worker`. It
+imports `engine.js` at top level, instantiates the Wasm lazily, parses the
+envelope string, and answers `chrome.runtime.onMessage` requests from this
+extension only. The content script calls `chrome.runtime.sendMessage` and stores
+the response. `web_accessible_resources` is removed: pages no longer need to
+load any extension file. The popup distinguishes "nothing scanned yet" from "no
+findings" and names the URL of the last scan.
+
+**Rejected.** An offscreen document hosting a dedicated worker (needs the
+`offscreen` permission); a `blob:` worker created in the page (subject to every
+page's CSP, and the worker would run in the page origin).
+
+**Cost.** The service worker may be stopped when idle, so the first scan after a
+restart pays Wasm instantiation again. Parsing is off the page's main thread but
+shares the service worker with any future background logic.
 
