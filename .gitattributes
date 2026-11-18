@@ -1,0 +1,5 @@
+# Engine offsets are UTF-8 byte offsets into the exact input, so fixture and
+# golden bytes must not change with the checkout platform. Pin LF everywhere.
+* text=auto eol=lf
+*.wasm binary
+*.png binary
